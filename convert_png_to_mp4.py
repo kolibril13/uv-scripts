@@ -9,24 +9,30 @@ from pathlib import Path
 import shutil
 import ffmpeg
 
-# Specify the folder containing the PNG images
-folder_path = Path.home() / "Downloads"  # Adjust path if necessary
-old_raw_path = folder_path / "old_raw"
-old_raw_path.mkdir(exist_ok=True)
+# Find the latest created folder IN THE CACHE FOLDER in Downloads
+downloads_path = Path.home() / "Downloads"
+cache_path = downloads_path / "cache"
+cache_path.mkdir(exist_ok=True)
 
-# Output video filename
-output_video = folder_path / "output_video.mp4"
+# Find all subfolders in the cache folder
+dirs = [d for d in cache_path.iterdir() if d.is_dir()]
+if not dirs:
+    raise RuntimeError("No folders found in cache.")
+latest_folder = max(dirs, key=lambda d: d.stat().st_ctime)
+
+# Output video filename (in Downloads)
+output_video = downloads_path / "output_video.mp4"
 
 try:
-    # List all PNG files in the folder and get the last frame
-    png_files = sorted(folder_path.glob("*.png"))
+    # List all PNG files in the latest folder inside cache and get the last frame
+    png_files = sorted(latest_folder.glob("*.png"))
     if not png_files:
-        raise ValueError("No PNG files found in the folder.")
+        raise ValueError("No PNG files found in the latest cache folder.")
 
     last_frame = png_files[-1]
 
     # Create temporary copies of the last frame to extend its duration
-    temp_frames_folder = folder_path / "temp_frames"
+    temp_frames_folder = latest_folder / "temp_frames"
     temp_frames_folder.mkdir(exist_ok=True)
 
     for frame in png_files:
@@ -48,11 +54,11 @@ try:
     # Clean up temporary frames
     shutil.rmtree(temp_frames_folder)
 
-    # Move original PNG images to old_raw folder
-    for frame in png_files:
-        shutil.move(str(frame), old_raw_path / frame.name)
+    # Move original PNG images to the main cache folder (not strictly necessary, but follows original pattern)
+    # for frame in png_files:
+    #     shutil.move(str(frame), cache_path / frame.name)
 
-    print(f"All original PNG images moved to: {old_raw_path}")
+    # print(f"All original PNG images moved to: {cache_path}")
 
 except ffmpeg.Error as e:
     print(f"An error occurred during conversion: {e.stderr.decode()}")

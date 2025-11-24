@@ -10,8 +10,10 @@ from pathlib import Path
 from PIL import Image
 
 downloads = Path.home() / "Downloads"
-archive = downloads / "old_original_images"
-archive.mkdir(exist_ok=True)
+
+# Use the same cache folder as convert_mov_to_mp4.py
+cache = downloads / "cache"
+cache.mkdir(exist_ok=True)
 
 for png in downloads.glob("*.png"):
     jpeg = png.with_suffix(".jpeg")
@@ -27,5 +29,5 @@ for png in downloads.glob("*.png"):
 
     img.save(jpeg, "JPEG", quality=70)
 
-    # Move original PNG using pathlib
-    png.rename(archive / png.name)
+    # Move original PNG using the cache folder
+    png.rename(cache / png.name)
