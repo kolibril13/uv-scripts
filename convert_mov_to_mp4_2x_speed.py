@@ -6,12 +6,13 @@
 # ///
 
 # header generated with
-# uv add --script convert_mov_to_mp4.py ffmpeg-python
+# uv add --script script.py ffmpeg-python
+
 from pathlib import Path
 import ffmpeg
 
 # Specify the folder containing the videos
-folder_path = Path.home() / "Desktop"  # Adjust path if necessary
+folder_path = Path.home() / "Downloads"  # Adjust path if necessary
 
 # Loop through all .mov files in the folder
 for file_path in folder_path.glob("*.mov"):

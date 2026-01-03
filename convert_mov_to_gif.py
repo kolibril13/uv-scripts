@@ -5,6 +5,9 @@
 # ]
 # ///
 
+# header generated with
+# uv add --script script.py ffmpeg-python
+
 from pathlib import Path
 import ffmpeg
 import shutil

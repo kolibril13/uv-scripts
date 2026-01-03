@@ -6,7 +6,8 @@
 # ///
 
 # header generated with
-# uv add --script convert_mov_to_mp4.py ffmpeg-python
+# uv add --script script.py ffmpeg-python
+
 from pathlib import Path
 import ffmpeg
 import shutil
