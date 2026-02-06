@@ -13,7 +13,7 @@ import librosa
 import soundfile as sf
 import noisereduce as nr
 
-TAPS_DIR = Path.home() / "Downloads" /
+TAPS_DIR = Path.home() / "Downloads" 
 
 
 def denoise_file(path: Path):
