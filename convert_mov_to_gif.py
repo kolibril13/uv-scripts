@@ -12,15 +12,16 @@ from pathlib import Path
 import ffmpeg
 import shutil
 
-folder_path = Path.home() / "Downloads"
-cache_path = folder_path / "cache"
+source_path = Path.home() / "Desktop"
+downloads_path = Path.home() / "Downloads"
+cache_path = downloads_path / "cache"
 cache_path.mkdir(exist_ok=True)
 
 FPS = 10
 SCALE_W = 480*2
 
-for file_path in folder_path.glob("*.mov"):
-    out_gif = file_path.with_suffix(".gif")
+for file_path in source_path.glob("*.mov"):
+    out_gif = downloads_path / file_path.with_suffix(".gif").name
     palette_png = file_path.with_name(file_path.stem + "_palette.png")
 
     try:

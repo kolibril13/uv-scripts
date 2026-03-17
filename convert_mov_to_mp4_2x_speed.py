@@ -12,16 +12,14 @@ from pathlib import Path
 import ffmpeg
 import shutil
 
-# Specify the folder containing the videos
-folder_path = Path.home() / "Downloads"  
+source_path = Path.home() / "Desktop"
+downloads_path = Path.home() / "Downloads"
 
-# Prepare the cache folder to move original files
-cache_path = folder_path / "cache"
+cache_path = downloads_path / "cache"
 cache_path.mkdir(exist_ok=True)
 
-# Loop through all .mov files in the folder
-for file_path in folder_path.glob("*.mov"):
-    output_file = file_path.with_suffix(".mp4")  # Change the file extension to .mp4
+for file_path in source_path.glob("*.mov"):
+    output_file = downloads_path / file_path.with_suffix(".mp4").name
 
     try:
         # Load the input file
