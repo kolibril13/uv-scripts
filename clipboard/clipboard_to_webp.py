@@ -9,9 +9,13 @@
 
 """Read an image from the macOS clipboard; save WebP + JPEG under ./tmp/ (same stem).
 
+WebP keeps alpha (no white matte) and uses high quality; optional lossless:
+``CLIPBOARD_WEBP_LOSSLESS=1``.
+
 Output directory is ``Path.cwd() / "tmp"``. Run from the project root so temps land in that repo.
 """
 
+import os
 import sys
 from datetime import datetime
 from io import BytesIO
@@ -33,9 +37,11 @@ _CLIPBOARD_IMAGE_UTIS = (
     "com.compuserve.gif",
 )
 
-# WebP: embed / repo (smaller).
-_WEBP_QUALITY = 84
+# WebP: higher quality + full alpha quality reduce "washed out" lossy color.
+# Set CLIPBOARD_WEBP_LOSSLESS=1 for mathematically lossless WebP (larger files).
+_WEBP_QUALITY = 95
 _WEBP_METHOD = 6
+_WEBP_ALPHA_QUALITY = 100
 
 # JPEG: tools that read images (e.g. IDE preview); slightly higher quality for text/UI.
 _JPEG_QUALITY = 90
@@ -62,6 +68,19 @@ def _to_rgb(img: Image.Image) -> Image.Image:
     return img.convert("RGB")
 
 
+def _prepare_for_webp(img: Image.Image) -> Image.Image:
+    """Keep alpha for WebP (no white matte); JPEG path still uses _to_rgb."""
+    if img.mode in ("RGBA", "LA", "PA"):
+        return img.convert("RGBA")
+    if img.mode == "P":
+        if "transparency" in img.info:
+            return img.convert("RGBA")
+        return img.convert("RGB")
+    if img.mode in ("RGB", "L"):
+        return img.convert("RGB")
+    return img.convert("RGB")
+
+
 def main() -> None:
     raw, uti = _clipboard_image_bytes()
     if not raw:
@@ -79,15 +98,25 @@ def main() -> None:
     out_jpeg = out_dir / f"{stamp}.jpg"
 
     img = Image.open(BytesIO(raw))
-    img = _to_rgb(img)
+    webp_img = _prepare_for_webp(img)
+    jpeg_img = _to_rgb(img)
 
-    img.save(
-        out_webp,
-        "WEBP",
-        quality=_WEBP_QUALITY,
-        method=_WEBP_METHOD,
-    )
-    img.save(out_jpeg, "JPEG", quality=_JPEG_QUALITY, optimize=True)
+    webp_kwargs: dict = {
+        "method": _WEBP_METHOD,
+    }
+    if os.environ.get("CLIPBOARD_WEBP_LOSSLESS", "").strip() in ("1", "true", "yes"):
+        webp_kwargs["lossless"] = True
+    else:
+        webp_kwargs["quality"] = _WEBP_QUALITY
+        if webp_img.mode == "RGBA":
+            webp_kwargs["alpha_quality"] = _WEBP_ALPHA_QUALITY
+
+    icc = img.info.get("icc_profile")
+    if icc:
+        webp_kwargs["icc_profile"] = icc
+
+    webp_img.save(out_webp, "WEBP", **webp_kwargs)
+    jpeg_img.save(out_jpeg, "JPEG", quality=_JPEG_QUALITY, optimize=True)
 
     print(f"Saved clipboard image ({uti}) to:")
     print(f"  WebP: {out_webp}")
