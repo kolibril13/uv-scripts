@@ -8,7 +8,7 @@
 from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 
-def split_pdf(pdf_path: Path, split_after_page: int = 3) -> None:
+def split_pdf(pdf_path: Path, split_after_page: int = 1) -> None:
     """
     Split pdf_path into two files:
       - part 1: pages 1 .. split_after_page
