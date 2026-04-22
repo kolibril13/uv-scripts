@@ -5,6 +5,7 @@
 # ///
 
 # brew install asmvik/formulae/skhd
+# skhd --start-service
 # python3 /Users/jan-hendrik/projects/uv-scripts/clipboard/setup_shortcut_skhd.py
 
 
