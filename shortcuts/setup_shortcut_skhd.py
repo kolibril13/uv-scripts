@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+
 REPO_ROOT = Path("/Users/jan-hendrik/projects/uv-scripts")
 DEFAULT_UV_BIN = Path("/opt/homebrew/bin/uv")
 BEGIN_MARKER = "# >>> uv-scripts shortcuts >>>"
@@ -31,10 +32,27 @@ class Binding:
     hotkey: str
     # human-readable label, e.g. "Cmd+Shift+2"
     label: str
-    # path to the target script
-    script: Path
     # one-line comment describing the binding
     description: str
+    # path to a uv-run script; mutually exclusive with `command`
+    script: Path | None = None
+    # raw shell command to run; mutually exclusive with `script`
+    command: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.script is None) == (self.command is None):
+            raise ValueError(
+                f"Binding {self.label!r} must set exactly one of `script` or `command`."
+            )
+
+    def shell_command(self, uv_bin: Path) -> str:
+        if self.script is not None:
+            return f"{uv_bin} run {self.script}"
+        assert self.command is not None
+        return self.command
+
+    def target_label(self) -> str:
+        return self.script.name if self.script is not None else (self.command or "")
 
 
 BINDINGS: list[Binding] = [
@@ -47,8 +65,11 @@ BINDINGS: list[Binding] = [
     Binding(
         hotkey="cmd + shift - 1",
         label="Cmd+Shift+1",
-        script=REPO_ROOT / "shortcuts" / "hello_world.py",
-        description="print hello world",
+        command=(
+            "open '/Users/jan-hendrik/projects/tauri-tldraw-annotate"
+            "/src-tauri/target/release/bundle/macos/curate-draw.app'"
+        ),
+        description="launch (or focus) the curate-draw screenshot annotator",
     ),
 ]
 
@@ -59,11 +80,14 @@ def fail(message: str) -> None:
 
 
 def validate_requirements(uv_bin: Path) -> None:
+    needs_uv = False
     for b in BINDINGS:
-        if not b.script.is_file():
-            fail(f"Script not found: {b.script}")
+        if b.script is not None:
+            if not b.script.is_file():
+                fail(f"Script not found: {b.script}")
+            needs_uv = True
 
-    if not uv_bin.is_file() or not os.access(uv_bin, os.X_OK):
+    if needs_uv and (not uv_bin.is_file() or not os.access(uv_bin, os.X_OK)):
         fail(
             f"uv binary not found or not executable: {uv_bin}\n"
             "Set UV_BIN to your uv path and run again."
@@ -103,7 +127,10 @@ def rewrite_config(skhd_config: Path, uv_bin: Path) -> Path:
     block_lines: list[str] = [BEGIN_MARKER]
     for b in BINDINGS:
         block_lines.append(f"# {b.label} -> {b.description}")
-        block_lines.append(f"{b.hotkey} : /bin/bash -lc '{uv_bin} run {b.script}'")
+        # Single-quote the command so spaces/flags are preserved; any embedded
+        # single quotes are escaped using the standard '"'"' idiom.
+        escaped = b.shell_command(uv_bin).replace("'", "'\"'\"'")
+        block_lines.append(f"{b.hotkey} : /bin/bash -lc '{escaped}'")
     block_lines.append(END_MARKER)
     block = "\n".join(block_lines)
 
@@ -143,7 +170,7 @@ def main() -> None:
     print()
     print("Hotkeys installed:")
     for b in BINDINGS:
-        print(f"  {b.label} -> {b.script.name} ({b.description})")
+        print(f"  {b.label} -> {b.target_label()} ({b.description})")
     print()
     print("If this is your first skhd setup:")
     print("  1) Grant Accessibility permission to skhd in System Settings")
