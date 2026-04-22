@@ -4,6 +4,10 @@
 # dependencies = []
 # ///
 
+# brew install asmvik/formulae/skhd
+# python3 /Users/jan-hendrik/projects/uv-scripts/clipboard/setup_shortcut_skhd.py
+
+
 """Install/update a skhd hotkey for saving clipboard images to Downloads."""
 
 import os
@@ -61,8 +65,8 @@ def rewrite_config(skhd_config: Path, uv_bin: Path) -> Path:
     block = "\n".join(
         [
             BEGIN_MARKER,
-            "# Cmd+Opt+G -> save clipboard image to ~/Downloads",
-            f"cmd + alt - g : /bin/bash -lc '{uv_bin} run {SCRIPT_PATH}'",
+            '# Cmd+Shift+2 -> save clipboard image to ~/Downloads (" on many layouts)',
+            f"cmd + shift - 2 : /bin/bash -lc '{uv_bin} run {SCRIPT_PATH}'",
             END_MARKER,
         ]
     )
@@ -101,7 +105,7 @@ def main() -> None:
     print(f"  {backup}")
     print()
     print("Hotkey installed:")
-    print("  Cmd+Opt+G -> run clipboard_to_downloads.py")
+    print('  Cmd+Shift+2 -> run clipboard_to_downloads.py')
     print()
     print("If this is your first skhd setup:")
     print("  1) Grant Accessibility permission to skhd in System Settings")
