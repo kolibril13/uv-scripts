@@ -17,9 +17,24 @@ cache.mkdir(exist_ok=True)
 
 TARGET_SIZE = 2 * 1024 * 1024  # 2 MB in bytes
 
+
+def move_to_cache(path: Path) -> Path:
+    """Move a file into cache/ without overwriting an existing file."""
+    dest = cache / path.name
+    counter = 2
+    while dest.exists():
+        dest = cache / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    path.rename(dest)
+    return dest
+
+
 for png in downloads.glob("*.png"):
+    # Skip outputs of previous runs.
+    if png.stem.endswith("_reduced"):
+        continue
+
     reduced = png.with_stem(png.stem + "_reduced")
-    img = Image.open(png)
     original_size = png.stat().st_size
 
     # Skip if already under target size
@@ -29,18 +44,19 @@ for png in downloads.glob("*.png"):
 
     print(f"  {png.name}: {original_size / 1024 / 1024:.2f} MB → reducing...")
 
-    # Start with original dimensions and quality
+    img = Image.open(png).convert("RGBA")
     width, height = img.size
-    quality = 95
+    temp_path = png.parent / ".temp_png"
 
-    # Iteratively reduce resolution and quality until under target size
+    # Quantizing to a 256-color palette shrinks PNGs far more than downscaling
+    # alone; downscale on top of that only if still over the target.
     while True:
-        # Create a temporary file to check size
-        temp_img = img.resize((width, height), Image.Resampling.LANCZOS)
-
-        # Save with current quality to temp location to check size
-        temp_path = png.parent / ".temp_png"
-        temp_img.save(temp_path, "PNG", optimize=True)
+        temp_img = img if (width, height) == img.size else img.resize(
+            (width, height), Image.Resampling.LANCZOS
+        )
+        temp_img.quantize(256, method=Image.Quantize.FASTOCTREE).save(
+            temp_path, "PNG", optimize=True
+        )
 
         file_size = temp_path.stat().st_size
 
@@ -59,8 +75,8 @@ for png in downloads.glob("*.png"):
 
         # If we've scaled too much, stop
         if width < 100 or height < 100:
-            print(f"    ! Could not reduce below 2 MB (minimum dimensions reached)")
+            print("    ! Could not reduce below 2 MB (minimum dimensions reached)")
             break
 
     # Move original PNG to cache
-    png.rename(cache / png.name)
+    move_to_cache(png)

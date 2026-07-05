@@ -1,24 +1,33 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = [
-#     "ffmpeg-python",
-# ]
+# dependencies = []
 # ///
 
-# header generated with
-# uv add --script script.py ffmpeg-python
+# Requires the ffmpeg CLI (e.g. `brew install ffmpeg`)
 
 from pathlib import Path
-import ffmpeg
 import shutil
+import subprocess
 
 source_path = Path.home() / "Desktop"
 downloads_path = Path.home() / "Downloads"
 cache_path = downloads_path / "cache"
 cache_path.mkdir(exist_ok=True)
 
+
+def move_to_cache(path: Path) -> Path:
+    """Move a file into cache/ without overwriting an existing file."""
+    dest = cache_path / path.name
+    counter = 2
+    while dest.exists():
+        dest = cache_path / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    shutil.move(str(path), dest)
+    return dest
+
+
 FPS = 10
-SCALE_W = 480*2
+SCALE_W = 480 * 2
 
 for file_path in source_path.glob("*.mov"):
     out_gif = downloads_path / file_path.with_suffix(".gif").name
@@ -26,51 +35,46 @@ for file_path in source_path.glob("*.mov"):
 
     try:
         # 1) Generate palette (single PNG!)
-        inp = ffmpeg.input(str(file_path))
-        pal_stream = (
-            inp.video
-            .filter("fps", fps=FPS)
-            .filter("scale", SCALE_W, -1, flags="lanczos")
-            .filter("palettegen", stats_mode="diff")
-        )
-
-        (
-            ffmpeg
-            .output(pal_stream, str(palette_png), vframes=1, update=1)
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(file_path),
+                "-vf", f"fps={FPS},scale={SCALE_W}:-1:flags=lanczos,palettegen=stats_mode=diff",
+                "-frames:v", "1",
+                "-update", "1",
+                str(palette_png),
+            ],
+            check=True,
+            capture_output=True,
         )
 
         # 2) Use palette to create GIF
-        inp2 = ffmpeg.input(str(file_path))
-        pal_in = ffmpeg.input(str(palette_png))
-
-        vid = (
-            inp2.video
-            .filter("fps", fps=FPS)
-            .filter("scale", SCALE_W, -1, flags="lanczos")
-        )
-
-        gif = ffmpeg.filter([vid, pal_in], "paletteuse", dither="bayer", bayer_scale=5)
-
-        (
-            ffmpeg
-            .output(gif, str(out_gif), loop=0)
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(file_path),
+                "-i", str(palette_png),
+                "-filter_complex",
+                f"[0:v]fps={FPS},scale={SCALE_W}:-1:flags=lanczos[v];"
+                "[v][1:v]paletteuse=dither=bayer:bayer_scale=5",
+                "-loop", "0",
+                str(out_gif),
+            ],
+            check=True,
+            capture_output=True,
         )
 
         print(f"Converted: {file_path} -> {out_gif}")
 
         # Move original .mov into cache
-        shutil.move(str(file_path), cache_path / file_path.name)
-        print(f"Moved original .mov to: {cache_path / file_path.name}")
+        cached = move_to_cache(file_path)
+        print(f"Moved original .mov to: {cached}")
 
-        # Optional: keep or delete the palette
-        palette_png.unlink(missing_ok=True)
-
-    except ffmpeg.Error as e:
-        err = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.decode("utf-8", errors="replace")
         print(f"Error converting {file_path}:\n{err}")
+    finally:
+        # Clean up the palette even when conversion fails
+        palette_png.unlink(missing_ok=True)
 
 print("Conversion complete.")

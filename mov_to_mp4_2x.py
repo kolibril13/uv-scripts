@@ -1,22 +1,32 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = [
-#     "ffmpeg-python",
-# ]
+# dependencies = []
 # ///
 
-# header generated with
-# uv add --script script.py ffmpeg-python
+# Requires the ffmpeg CLI (e.g. `brew install ffmpeg`)
 
 from pathlib import Path
-import ffmpeg
+import json
 import shutil
+import subprocess
 
 source_path = Path.home() / "Desktop"
 downloads_path = Path.home() / "Downloads"
 
 cache_path = downloads_path / "cache"
 cache_path.mkdir(exist_ok=True)
+
+
+def move_to_cache(path: Path) -> Path:
+    """Move a file into cache/ without overwriting an existing file."""
+    dest = cache_path / path.name
+    counter = 2
+    while dest.exists():
+        dest = cache_path / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    shutil.move(str(path), dest)
+    return dest
+
 
 for file_path in source_path.glob("*.mov"):
     output_file = downloads_path / file_path.with_suffix(".mp4").name
@@ -30,39 +40,51 @@ for file_path in source_path.glob("*.mov"):
         #   3. Then apply setpts=0.5*PTS on the clean CFR stream.
         # Output frame rate is implicitly 2 * src_fps, which keeps every
         # frame and avoids stalls/duplicated frames during "quiet" regions.
-        probe = ffmpeg.probe(str(file_path))
-        video_stream = next(s for s in probe['streams'] if s['codec_type'] == 'video')
-        rate_str = video_stream.get('avg_frame_rate') or video_stream.get('r_frame_rate') or '60/1'
-        num, den = rate_str.split('/')
+        probe = json.loads(
+            subprocess.run(
+                [
+                    "ffprobe", "-v", "error",
+                    "-select_streams", "v:0",
+                    "-show_entries", "stream=avg_frame_rate,r_frame_rate",
+                    "-of", "json",
+                    str(file_path),
+                ],
+                check=True,
+                capture_output=True,
+            ).stdout
+        )
+        video_stream = probe["streams"][0]
+        rate_str = video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "60/1"
+        num, den = rate_str.split("/")
         num, den = float(num), float(den)
         src_fps = num / den if den and num else 60.0
         # Clamp to a sane range in case probing returns something weird.
         src_fps = max(15.0, min(src_fps, 120.0))
 
-        stream = ffmpeg.input(str(file_path))
-        video = (
-            stream.video
-            .filter('fps', fps=src_fps)          # VFR -> CFR
-            .filter('setpts', '0.5*PTS')         # 2x speed
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(file_path),
+                "-vf", f"fps={src_fps},setpts=0.5*PTS",  # VFR -> CFR, then 2x speed
+                "-an",
+                "-vcodec", "libx264",
+                "-preset", "medium",
+                "-crf", "20",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(output_file),
+            ],
+            check=True,
+            capture_output=True,
         )
-
-        ffmpeg.output(
-            video,
-            str(output_file),
-            vcodec='libx264',
-            preset='medium',
-            crf=20,
-            pix_fmt='yuv420p',
-            movflags='+faststart',
-            an=None,
-        ).overwrite_output().run()
         print(f"Converted: {file_path} -> {output_file} (src {src_fps:.2f} fps)")
 
         # Move the old .mov file into cache folder
-        shutil.move(str(file_path), cache_path / file_path.name)
-        print(f"Moved original .mov to: {cache_path / file_path.name}")
+        cached = move_to_cache(file_path)
+        print(f"Moved original .mov to: {cached}")
 
-    except ffmpeg.Error as e:
-        print(f"Error converting {file_path}: {e}")
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.decode("utf-8", errors="replace")
+        print(f"Error converting {file_path}:\n{err}")
 
 print("Conversion complete.")

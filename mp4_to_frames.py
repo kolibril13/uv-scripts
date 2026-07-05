@@ -1,16 +1,15 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = [
-#     "ffmpeg-python",
-# ]
+# dependencies = []
 # ///
+
+# Requires the ffmpeg CLI (e.g. `brew install ffmpeg`)
 
 from __future__ import annotations
 
 import argparse
+import subprocess
 from pathlib import Path
-
-import ffmpeg
 
 
 def resolve_input_video(downloads: Path, filename: str | None) -> Path:
@@ -47,11 +46,10 @@ def create_output_dir(downloads: Path, video_path: Path) -> Path:
 
 def extract_frames(video_path: Path, out_dir: Path) -> None:
     pattern = str(out_dir / "frame_%06d.png")
-    (
-        ffmpeg.input(str(video_path))
-        .output(pattern, start_number=1)
-        .overwrite_output()
-        .run(capture_stdout=True, capture_stderr=True)
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(video_path), "-start_number", "1", pattern],
+        check=True,
+        capture_output=True,
     )
 
 
@@ -75,8 +73,8 @@ def main() -> None:
         out_dir = create_output_dir(downloads, video_path)
         extract_frames(video_path, out_dir)
         print(f"Extracted frames from {video_path.name} -> {out_dir}")
-    except ffmpeg.Error as exc:
-        details = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else str(exc)
+    except subprocess.CalledProcessError as exc:
+        details = exc.stderr.decode("utf-8", errors="replace")
         print(f"ffmpeg error while processing video:\n{details}")
     except Exception as exc:
         print(f"Error: {exc}")

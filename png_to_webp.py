@@ -15,19 +15,28 @@ downloads = Path.home() / "Downloads"
 cache = downloads / "cache"
 cache.mkdir(exist_ok=True)
 
+
+def move_to_cache(path: Path) -> Path:
+    """Move a file into cache/ without overwriting an existing file."""
+    dest = cache / path.name
+    counter = 2
+    while dest.exists():
+        dest = cache / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    path.rename(dest)
+    return dest
+
+
 for png in downloads.glob("*.png"):
     webp = png.with_suffix(".webp")
-    img = Image.open(png)
 
-    # Handle alpha transparencies - WebP supports alpha, but for smaller size convert to RGB
-    if img.mode in ("RGBA", "LA", "PA"):
-        bg = Image.new("RGB", img.size, (255, 255, 255))
-        bg.paste(img, mask=img.getchannel("A"))
-        img = bg
-    else:
-        img = img.convert("RGB")
+    # WebP supports alpha, but flatten onto white for smaller files
+    # (incl. palette-mode PNGs with transparency)
+    img = Image.open(png).convert("RGBA")
+    bg = Image.new("RGB", img.size, (255, 255, 255))
+    bg.paste(img, mask=img.getchannel("A"))
 
-    img.save(webp, "WEBP", quality=70, method=6)
+    bg.save(webp, "WEBP", quality=70, method=6)
 
     # Move original PNG using the cache folder
-    png.rename(cache / png.name)
+    move_to_cache(png)

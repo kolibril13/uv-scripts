@@ -13,7 +13,7 @@ import librosa
 import soundfile as sf
 import noisereduce as nr
 
-TAPS_DIR = Path.home() / "Downloads" 
+DOWNLOADS_DIR = Path.home() / "Downloads" 
 
 
 def denoise_file(path: Path):
@@ -42,10 +42,13 @@ def denoise_file(path: Path):
 
 
 def main():
-    wav_files = sorted(TAPS_DIR.glob("*.wav"))
+    # Skip outputs of previous runs so reruns don't denoise twice.
+    wav_files = sorted(
+        p for p in DOWNLOADS_DIR.glob("*.wav") if not p.stem.endswith("_denoised")
+    )
 
     if not wav_files:
-        print("No wav files found in:", TAPS_DIR)
+        print("No wav files found in:", DOWNLOADS_DIR)
         return
 
     for wav in wav_files:

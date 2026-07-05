@@ -1,20 +1,29 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = [
-#     "ffmpeg-python",
-# ]
+# dependencies = []
 # ///
 
-# header generated with
-# uv add --script script.py ffmpeg-python
+# Requires the ffmpeg CLI (e.g. `brew install ffmpeg`)
 
 from pathlib import Path
-import ffmpeg
 import shutil
+import subprocess
 
 downloads_path = Path.home() / "Downloads"
 cache_path = downloads_path / "cache"
 cache_path.mkdir(exist_ok=True)
+
+
+def move_to_cache(path: Path) -> Path:
+    """Move a file into cache/ without overwriting an existing file."""
+    dest = cache_path / path.name
+    counter = 2
+    while dest.exists():
+        dest = cache_path / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    shutil.move(str(path), dest)
+    return dest
+
 
 for file_path in downloads_path.glob("*.mp4"):
     # Skip outputs of previous runs.
@@ -24,25 +33,28 @@ for file_path in downloads_path.glob("*.mp4"):
     output_file = file_path.with_name(file_path.stem + "_web.mp4")
 
     try:
-        stream = ffmpeg.input(str(file_path))
-
-        ffmpeg.output(
-            stream.video,
-            str(output_file),
-            vcodec='libx264',
-            preset='medium',
-            crf=23,
-            pix_fmt='yuv420p',
-            movflags='+faststart',
-            an=None,
-        ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(file_path),
+                "-an",
+                "-vcodec", "libx264",
+                "-preset", "medium",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(output_file),
+            ],
+            check=True,
+            capture_output=True,
+        )
         print(f"Converted: {file_path} -> {output_file}")
 
-        shutil.move(str(file_path), cache_path / file_path.name)
-        print(f"Moved original .mp4 to: {cache_path / file_path.name}")
+        cached = move_to_cache(file_path)
+        print(f"Moved original .mp4 to: {cached}")
 
-    except ffmpeg.Error as e:
-        err = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.decode("utf-8", errors="replace")
         print(f"Error converting {file_path}:\n{err}")
 
 print("Conversion complete.")
