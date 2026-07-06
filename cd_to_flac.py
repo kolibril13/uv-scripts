@@ -19,10 +19,14 @@ import base64
 import hashlib
 import plistlib
 import re
+import socket
 import subprocess
 from pathlib import Path
 
 import musicbrainzngs
+
+# Without this, a stalled connection to MusicBrainz/Cover Art Archive hangs forever.
+socket.setdefaulttimeout(15)
 
 library_path = (
     Path.home()
