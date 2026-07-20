@@ -59,8 +59,8 @@ BINDINGS: list[Binding] = [
     Binding(
         hotkey="cmd + shift - 2",
         label="Cmd+Shift+2",
-        script=REPO_ROOT / "clipboard" / "clipboard_to_downloads.py",
-        description='save clipboard image to ~/Downloads (" on many layouts)',
+        script=REPO_ROOT / "clipboard" / "clipboard_to_preview.py",
+        description='open clipboard image in Preview (" on many layouts)',
     ),
     Binding(
         hotkey="cmd + shift - 1",
@@ -157,7 +157,7 @@ def reload_skhd() -> None:
 
 def main() -> None:
     skhd_config = Path(os.environ.get("SKHD_CONFIG", str(Path.home() / ".skhdrc"))).expanduser().resolve()
-    uv_bin = Path(os.environ.get("UV_BIN", str(DEFAULT_UV_BIN))).expanduser().resolve()
+    uv_bin = Path(os.environ.get("UV_BIN", str(DEFAULT_UV_BIN))).expanduser()
 
     validate_requirements(uv_bin)
     backup = rewrite_config(skhd_config, uv_bin)
