@@ -147,9 +147,10 @@ def reload_skhd() -> None:
     ).returncode == 0
 
     if is_running:
-        reload_result = subprocess.run(["skhd", "--reload"], check=False)
-        if reload_result.returncode != 0:
-            subprocess.run(["skhd", "--restart-service"], check=False)
+        # `skhd --reload` can report success (exit 0) while leaving the
+        # running daemon with a stale/empty hotkey table, so always force a
+        # full service restart instead of trusting its exit code.
+        subprocess.run(["skhd", "--restart-service"], check=False)
         return
 
     subprocess.run(["skhd", "--start-service"], check=False)
