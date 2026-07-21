@@ -66,7 +66,7 @@ BINDINGS: list[Binding] = [
         hotkey="cmd + shift - 1",
         label="Cmd+Shift+1",
         command=(
-            "open '/Users/jan-hendrik/projects/tauri-tldraw-annotate"
+            "open '/Users/jan-hendrik/projects/curate-draw"
             "/src-tauri/target/release/bundle/macos/curate-draw.app'"
         ),
         description="launch (or focus) the curate-draw screenshot annotator",
