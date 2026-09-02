@@ -8,6 +8,8 @@
 from pathlib import Path
 import subprocess
 
+from settings import END_HOLD_SECONDS
+
 # Find the latest created folder IN THE CACHE FOLDER in Downloads
 downloads_path = Path.home() / "Downloads"
 cache_path = downloads_path / "cache"
@@ -28,14 +30,19 @@ try:
     if not png_files:
         raise ValueError("No PNG files found in the latest cache folder.")
 
+    # libx264 + yuv420p requires even dimensions
+    video_filters = "scale=ceil(iw/2)*2:ceil(ih/2)*2"
+    if END_HOLD_SECONDS > 0:
+        # hold the last frame as a still for the configured duration
+        video_filters += f",tpad=stop_mode=clone:stop_duration={END_HOLD_SECONDS}"
+
     subprocess.run(
         [
             "ffmpeg", "-y",
             "-pattern_type", "glob",
             "-framerate", "24",
             "-i", str(latest_folder / "*.png"),
-            # libx264 + yuv420p requires even dimensions; hold last frame 2s
-            "-vf", "scale=ceil(iw/2)*2:ceil(ih/2)*2,tpad=stop_mode=clone:stop_duration=2",
+            "-vf", video_filters,
             "-vcodec", "libx264",
             "-pix_fmt", "yuv420p",
             str(output_video),
